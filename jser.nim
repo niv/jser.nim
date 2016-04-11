@@ -1,15 +1,56 @@
 import json
 
+## A module to easily de/serialize json data into/from native types, like tuples,
+## seqs, or single variables.
+##
+## Usage
+## -----
+##
+## .. code-block::nim
+##   import jser
+##
+##   let t: tuple[x: string, y: float]
+##   let myjson = parseJson("{x: \"test\", y: 1.2}")
+##
+##   t.fromJson(myjson)
+##   echo t.toJson
+##
+## There is experimental support for iso8601-style timestamps. To use, simply
+##
+## .. code-block::nim
+##   import jser/iso8601
+##
+## You can easily support arbitary custom types by implementing the respectively-
+## typed to/fromJson procs. You need to handle all possible flags correctly.
+##
+## Error Handling
+## --------------
+##
+## All serializing errors are supposed to be compiler errors. toJson should never
+## throw any exceptions by itself.
+##
+## All deserializing errors should be robust (meaning, you can just throw user
+## input against it without fear of unintended side effects/exploits). All
+## conversion errors will raise a DeserializeError with a hopefully useful message,
+## which should be okay to pass on to the user.
+##
+## If fromJson raises any errors, you are not supposed to rely on the state of
+## the target variable you are parsing into - it is in a undefined state at that
+## point.
+
 export json
 
 type
-  # Raised when something prevents json from being deserialized into a tuple.
-  # Your tuple might be in a undefined state at that point.
-  DeserializeError* = object of Exception
+  DeserializeError* = object of Exception ## \
+  ## Raised when something prevents json from being deserialized into a tuple.
+  ## Your tuple might be in a undefined state at that point.
 
-  DeserializerFlags* {.pure.} = enum
-    # Require all fields of the tuple.
-    ErrorWhenMissing,
+  DeserializerFlags* {.pure.} = enum ## \
+    ## Possible flags to pass in to the deserializer.
+
+
+    ErrorWhenMissing, ## Require all fields of the tuple.
+
     # Autocast types where possible, allows for gentler
     # deserialisation. Default is to error when types
     # cannot be converted directly.
@@ -19,10 +60,7 @@ type
     # Fail when encoutering nil
     # TODO: ForbidNil,
 
-    # Applies to structs and seqs only:
-    # Don't emit nil fields. Otherwise, nil values are
-    # emitted as json null values.
-    SkipNil,
+    SkipNil, ## Don't emit nil fields. (seqs and tuples only)
 
     # Transform nil fields into their json defaults
     # when nil. This means that strings will be ""
@@ -30,8 +68,8 @@ type
     # TODO: DefaultNil
 
 const
-  # The default settings are strict parsing and generating,
-  # meaning all fields need to be filled.
+  ## The default settings are strict parsing and generating,
+  ## meaning all fields need to be filled.
   DefaultDeserializerFlags* = {
     DeserializerFlags.ErrorWhenMissing
   }
