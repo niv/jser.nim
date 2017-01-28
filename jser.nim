@@ -128,6 +128,15 @@ proc fromJson*[T: FloatType](t: var T, j: JsonNode, flags = DefaultDeserializerF
   if j.kind != JFloat: raise newException(DeserializeError, $j & " not floating point")
   t = j.getFNum
 
+# enum
+
+proc toJson*[T: enum](t: T, flags = DefaultSerializerFlags): JsonNode =
+  newJInt(t.int)
+
+proc fromJson*[T: enum](t: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
+  if j.kind != JInt: raise newException(DeserializeError, $j & " not int (enumeration)")
+  t = cast[T](j.getNum)
+
 # tuple
 
 proc toJson*[T: tuple](t: T, flags = DefaultSerializerFlags): JsonNode =
