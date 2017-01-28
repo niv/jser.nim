@@ -139,22 +139,29 @@ proc fromJson*[T: enum](t: var T, j: JsonNode, flags = DefaultDeserializerFlags)
 
 # tuple
 
-proc toJson*[T: tuple](t: T, flags = DefaultSerializerFlags): JsonNode =
+proc toJson*[T: (tuple|object)](t: T, flags = DefaultSerializerFlags): JsonNode =
   result = newJObject()
   for k, v in fieldPairs(t):
-    when v is Nilable:
-      if not (SerializerFlags.SkipNil in flags and isNil(v)):
-        result[k] = toJson(v, flags)
+    # don't bother serialising fields we have no serialiser for
+    when compiles(toJson(v, flags)):
+      when compiles(isNil(v)):
+        if not (SerializerFlags.SkipNil in flags and isNil(v)):
+          let serialised = toJson(v, flags)
+          if serialised != nil: result[k] = serialised
+      else:
+        let serialised = toJson(v, flags)
+        if serialised != nil: result[k] = toJson(v, flags)
 
-    else:
-      result[k] = toJson(v, flags)
-
-proc fromJson*[T: tuple](v: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
+proc fromJson*[T: (tuple|object)](v: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
   try:
     if j.kind != JObject: raise newException(DeserializeError, $j & " not tuple")
     for k, v in fieldPairs(v):
       # hackhack: assign back to tuple
-      if j.hasKey(k): fromJson(v, j[k], flags)
+      if j.hasKey(k):
+        when compiles(fromJson(v, j[k], flags)):
+          fromJson(v, j[k], flags)
+        # else:
+        #   debugEcho "jser: " & name(T) & ": No deserializer for ", k, " of value ", repr(v)
       elif DeserializerFlags.ErrorWhenMissing in flags:
         raise newException(DeserializeError, "json missing key: " & $k)
 
@@ -162,18 +169,22 @@ proc fromJson*[T: tuple](v: var T, j: JsonNode, flags = DefaultDeserializerFlags
     raise newException(DeserializeError, getCurrentExceptionMsg() & ", while deserializing " & $j)
   return
 
-
 # seq
 
 proc toJson*[T: seq](t: T, flags = DefaultSerializerFlags): JsonNode =
   result = newJArray()
   for e in t:
-    when e is Nilable:
-      if not (SerializerFlags.SkipNil in flags and isNil(e)):
-        result.add(toJson(e, flags))
-    else:
-      result.add(toJson(e, flags))
+    when compiles(toJson(e, flags)):
+      when compiles(isNil(e)):
+        if not (SerializerFlags.SkipNil in flags and isNil(e)):
+          let serialised = toJson(e, flags)
+          if serialised != nil: result.add(serialised)
+      else:
+        let serialised = toJson(e, flags)
+        if serialised != nil: result.add(serialised)
 
 proc fromJson*[T](v: var seq[T], j: JsonNode, flags = DefaultDeserializerFlags): void =
-  v = j.getElems.map(proc (e: JsonNode): T =
-    fromJson(result, e, flags))
+  if j.kind != JArray: raise newException(DeserializeError, $j & " not array")
+  v = newSeq[T](j.getElems.len)
+  for idx, e in j.getElems:
+    fromJson(v[idx], e, flags)
