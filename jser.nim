@@ -113,7 +113,7 @@ proc fromJson*[T: string](t: var T, j: JsonNode, flags = DefaultDeserializerFlag
 # integer
 
 proc toJson*[T: IntType](t: T, flags = DefaultSerializerFlags): JsonNode =
-  result = %t
+  result = newJInt(t.BiggestInt)
 
 proc fromJson*[T: IntType](t: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
   if j.kind != JInt: raise newException(DeserializeError, $j & " not integer")
