@@ -2,12 +2,12 @@
 
 version       = "0.1.1"
 author        = "niv"
-description   = "json de/serializer for tuples and more"
+description   = "json de/serializer for native data types"
 license       = "MIT"
 
 skipDirs      = @[ "tests/" ]
 
 # Dependencies
 
-requires "nim >= 0.13.0"
+requires "nim >= 0.18.0"
 

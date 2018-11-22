@@ -1,2 +1,6 @@
 nimcache
 docs
+tests/fuzzing/results
+bin/nwn_*
+tests/t*
+!tests/t*.nim
