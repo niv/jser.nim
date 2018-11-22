@@ -1,4 +1,4 @@
-import json
+import json, strutils
 
 ## A module to easily de/serialize json data into/from native types, like tuples,
 ## seqs, or single variables.
@@ -50,6 +50,9 @@ type
 
 
     ErrorWhenMissing, ## Require all fields of the tuple.
+
+    CompareIgnoreStyle ## Allow json-to-nim style differences; i.e.
+                       ## myField == my_field
 
     # Autocast types where possible, allows for gentler
     # deserialisation. Default is to error when types
@@ -155,11 +158,21 @@ proc toJson*[T: (tuple|object)](t: T, flags = DefaultSerializerFlags): JsonNode 
 proc fromJson*[T: (tuple|object)](v: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
   try:
     if j.kind != JObject: raise newException(DeserializeError, $j & " not tuple")
+    let jkeys = toSeq(pairs(j)).mapIt(it[0])
+
     for k, v in fieldPairs(v):
+
+      var resolvedJsonKey = k # the actual string key we are looking to resolve
+      if DeserializerFlags.CompareIgnoreStyle in flags:
+        for jk in jkeys:
+          if 0 == cmpIgnoreStyle(k, jk):
+            resolvedJsonKey = jk
+            break
+
       # hackhack: assign back to tuple
-      if j.hasKey(k):
-        when compiles(fromJson(v, j[k], flags)):
-          fromJson(v, j[k], flags)
+      if j.hasKey(resolvedJsonKey):
+        when compiles(fromJson(v, j[resolvedJsonKey], flags)):
+          fromJson(v, j[resolvedJsonKey], flags)
         # else:
         #   debugEcho "jser: " & name(T) & ": No deserializer for ", k, " of value ", repr(v)
       elif DeserializerFlags.ErrorWhenMissing in flags:
