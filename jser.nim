@@ -1,4 +1,4 @@
-import json, strutils
+import json, strutils, options, typeinfo, typetraits
 
 ## A module to easily de/serialize json data into/from native types, like tuples,
 ## seqs, or single variables.
@@ -149,8 +149,10 @@ proc toJson*[T: (tuple|object)](t: T, flags = DefaultSerializerFlags): JsonNode 
           let serialised = toJson(v, flags)
           if serialised != nil: result[k] = serialised
       else:
-        let serialised = toJson(v, flags)
-        if serialised != nil: result[k] = toJson(v, flags)
+        # Don't emit none() optionals
+        if not (v is Option) or v.isSome:
+          let serialised = toJson(v, flags)
+          if serialised != nil: result[k] = toJson(v, flags)
 
 proc fromJson*[T: (tuple|object)](v: var T, j: JsonNode, flags = DefaultDeserializerFlags): void =
   try:
@@ -166,12 +168,29 @@ proc fromJson*[T: (tuple|object)](v: var T, j: JsonNode, flags = DefaultDeserial
             resolvedJsonKey = jk
             break
 
-      # hackhack: assign back to tuple
       if j.hasKey(resolvedJsonKey):
-        when compiles(fromJson(v, j[resolvedJsonKey], flags)):
-          fromJson(v, j[resolvedJsonKey], flags)
-        # else:
-        #   debugEcho "jser: " & name(T) & ": No deserializer for ", k, " of value ", repr(v)
+        when v is Option:
+          var placeholder: type(v.get)
+          when compiles(fromJson(placeholder, j[resolvedJsonKey], flags)):
+            fromJson(placeholder, j[resolvedJsonKey], flags)
+            var optPlaceholder = some(placeholder)
+            assign(toAny(v), toAny(optPlaceholder))
+          else:
+            raise newException(DeserializeError,
+              "No deserializer for type: " & name(type(placeholder)))
+
+        else:
+          when compiles(fromJson(v, j[resolvedJsonKey], flags)):
+            fromJson(v, j[resolvedJsonKey], flags)
+          else:
+            raise newException(DeserializeError,
+              "No deserializer for type: " & name(type(v)))
+
+      elif v is Option:
+        # It's ok: this is a optional value. Make sure to fill in a blank.
+        var empty: type(v)
+        assign(toAny(v), toAny(empty))
+
       elif DeserializerFlags.ErrorWhenMissing in flags:
         raise newException(DeserializeError, "json missing key: " & $k)
 

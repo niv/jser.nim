@@ -1,6 +1,6 @@
 import ../jser
 
-import unittest, times
+import unittest, times, options
 
 template deserialize(label: string, t: untyped,
     valid: JsonNode, expected: untyped): untyped =
@@ -35,3 +35,38 @@ suite "ignoreStyle deserialisation":
   test "ignores style when asked":
     instance.fromJson(%*{"camel_case": "test"}, {DeserializerFlags.CompareIgnoreStyle})
     check instance.camelCase == "test"
+
+suite "optional":
+  type Testable = tuple
+    required: string
+    optional: Option[string]
+
+  test "when deserializing, error about missing required values":
+    var instance: Testable
+    expect DeserializeError:
+      instance.fromJson(%*{"optional": "hi"})
+
+  test "when deserializing, skips missing optional values":
+    var instance: Testable
+    instance.fromJson(%*{"required": "hi"})
+    check instance.required == "hi"
+    check instance.optional.isNone
+
+  test "when deserializing, fill in provided optional values":
+    var instance: Testable
+    instance.fromJson(%*{"required": "hi", "optional": "there"})
+    check instance.required == "hi"
+    check instance.optional.get() == "there"
+
+  test "when deserializing, replace filled fields with empty":
+    var instance: Testable
+    instance.optional = some("hi")
+    instance.fromJson(%*{"required": "hi"})
+    check instance.required == "hi"
+    check instance.optional.isNone
+
+  test "when serializing empty optionals, emit blank":
+    var instance: Testable
+    instance.required = ""
+    instance.optional = none(string)
+    check $instance.toJson() == """{"required":""}"""
