@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.0"
+version       = "0.2.1"
 author        = "niv"
 description   = "json de/serializer for native data types"
 license       = "MIT"
